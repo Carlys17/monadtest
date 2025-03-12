@@ -1,0 +1,71 @@
+import { useState, useEffect } from "react";
+import { ethers } from "ethers";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+
+const contractAddress = "0x044Ed1AEF9C576AAe318243A13255425d1B70cba";
+const abi = [
+    "function stressTest(uint256 iterations) external payable",
+    "function getLeaderboard() external view returns (address[], uint256[])"
+];
+
+export default function MonadShooterGame() {
+    const [provider, setProvider] = useState(null);
+    const [contract, setContract] = useState(null);
+    const [leaderboard, setLeaderboard] = useState([]);
+    const [account, setAccount] = useState(null);
+
+    useEffect(() => {
+        if (window.ethereum) {
+            const web3Provider = new ethers.BrowserProvider(window.ethereum);
+            setProvider(web3Provider);
+        }
+    }, []);
+
+    const connectWallet = async () => {
+        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+        setAccount(accounts[0]);
+        const signer = await provider.getSigner();
+        setContract(new ethers.Contract(contractAddress, abi, signer));
+    };
+
+    const shoot = async () => {
+        if (!contract) return;
+        const tx = await contract.stressTest(1, { value: ethers.parseEther("0.01") });
+        await tx.wait();
+        fetchLeaderboard();
+    };
+
+    const fetchLeaderboard = async () => {
+        if (!contract) return;
+        const [addresses, scores] = await contract.getLeaderboard();
+        setLeaderboard(addresses.map((addr, idx) => ({ address: addr, score: scores[idx].toString() })));
+    };
+
+    return (
+        <div className="flex flex-col items-center space-y-4 p-4">
+            <h1 className="text-2xl font-bold">Monad Shooter Game</h1>
+            {account ? (
+                <>
+                    <Button onClick={shoot} className="bg-red-500 hover:bg-red-700">
+                        🔫 Shoot
+                    </Button>
+                    <Card className="w-80">
+                        <CardContent>
+                            <h2 className="text-lg font-semibold">Leaderboard</h2>
+                            {leaderboard.map((entry, index) => (
+                                <p key={index}>
+                                    {index + 1}. {entry.address.substring(0, 6)}... - {entry.score} shots
+                                </p>
+                            ))}
+                        </CardContent>
+                    </Card>
+                </>
+            ) : (
+                <Button onClick={connectWallet} className="bg-blue-500 hover:bg-blue-700">
+                    Connect Wallet
+                </Button>
+            )}
+        </div>
+    );
+}
